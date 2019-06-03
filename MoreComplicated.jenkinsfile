@@ -7,7 +7,9 @@ def printStuff(){
 }
 
 def printFSInfo(){
-    echo "Root Directory is: " + System.getProperty("user.dir");
+    sh """
+        mkdir newDir
+    """"
     // echo "New File Created?: " + fs.exists("C:/Local Jenkins Practice/JenkinsCreated.txt");
 }
 
