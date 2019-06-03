@@ -1,4 +1,4 @@
-def testFunc(){
+def testFunction(){
   echo "Hello Atom"
 }
 pipeline {
@@ -6,7 +6,7 @@ pipeline {
   stages {
     stage('HelloTest') {
       steps{
-        testFunc()
+        testFunction()
       }
     }
   }
