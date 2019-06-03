@@ -6,6 +6,13 @@ def printStuff(){
     }
 }
 
+def printFSInfo(){
+    FileSystem fs = new FileSystem();
+    echo "Root Directory is: " + System.getProperty("user.dir");
+    fs.createFile("C:\Local Jenkins Practice\JenkinsCreated.txt");
+    echo "New File Created?: " + fs.exists("C:\Local Jenkins Practice\JenkinsCreated.txt");
+}
+
 
 pipeline{
     agent any
@@ -23,6 +30,19 @@ pipeline{
                 }
                 failure{
                     echo "========A execution failed========"
+                }
+            }
+        }
+        stage("Mess with FS"){
+            steps{
+                printFsInfo();
+            }
+            post{
+                success{
+                    echo "========FS executed successfully========"
+                }
+                failure{
+                    echo "========FS execution failed========"
                 }
             }
         }
