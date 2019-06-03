@@ -35,7 +35,7 @@ pipeline{
         }
         stage("Mess with FS"){
             steps{
-                printFsInfo();
+                printFSInfo();
             }
             post{
                 success{
