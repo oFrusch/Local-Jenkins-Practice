@@ -5,7 +5,9 @@ pipeline {
   agent any
   stages {
     stage('HelloTest') {
-      testFunc()
+      steps{
+        testFunc()
+      }
     }
   }
 }
