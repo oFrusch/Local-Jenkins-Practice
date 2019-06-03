@@ -1,0 +1,29 @@
+def printStuff(){
+    int i = 0;
+    while i < 10{
+        "Executing Part A"
+    }
+}
+
+
+pipeline{
+    agent any
+    stages{
+        stage("A"){
+            steps{
+                printStuff();
+            }
+            post{
+                always{
+                    echo "========always========"
+                }
+                success{
+                    echo "========A executed successfully========"
+                }
+                failure{
+                    echo "========A execution failed========"
+                }
+            }
+        }
+    }
+}
