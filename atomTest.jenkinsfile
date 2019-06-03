@@ -1,0 +1,11 @@
+def testFunc(){
+  echo "Hello Atom"
+}
+pipeline {
+  agent any
+  stages {
+    stage('HelloTest') {
+      testFunc()
+    }
+  }
+}
