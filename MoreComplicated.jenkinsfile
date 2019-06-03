@@ -1,6 +1,6 @@
 def printStuff(){
     int i = 0;
-    while i < 10{
+    while (i < 10) {
         "Executing Part A"
     }
 }
