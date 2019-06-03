@@ -1,0 +1,37 @@
+pipeline{
+    agent any
+    stages{
+        stage("Build Part A"){
+            steps{
+                echo "Building A"
+            }
+            post{
+                always{
+                    echo "========always========"
+                }
+                success{
+                    echo "========A executed successfully========"
+                }
+                failure{
+                    echo "========A execution failed========"
+                }
+            }
+        }
+        stage("Build Part B"){
+            steps{
+                echo "Building B"
+            }
+            post{
+                always{
+                    echo "========always========"
+                }
+                success{
+                    echo "========B executed successfully========"
+                }
+                failure{
+                    echo "========B execution failed========"
+                }
+            }
+        }
+    }
+}
