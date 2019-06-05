@@ -1,0 +1,21 @@
+pipeline{
+    agent any
+    stages{
+        stage("A"){
+            steps{
+                sh """echo Hello World from Groovy file"""
+            }
+            post{
+                always{
+                    echo "========always========"
+                }
+                success{
+                    echo "========A executed successfully========"
+                }
+                failure{
+                    echo "========A execution failed========"
+                }
+            }
+        }
+    }
+}

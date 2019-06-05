@@ -1,0 +1,34 @@
+pipeline{
+    agent any
+    stages{
+        stage("A"){
+            steps{
+                printStuff();
+            }
+            post{
+                always{
+                    echo "========always========"
+                }
+                success{
+                    echo "========A executed successfully========"
+                }
+                failure{
+                    echo "========A execution failed========"
+                }
+            }
+        }
+        stage("Mess with FS"){
+            steps{
+                printFSInfo();
+            }
+            post{
+                success{
+                    echo "========FS executed successfully========"
+                }
+                failure{
+                    echo "========FS execution failed========"
+                }
+            }
+        }
+    }
+}

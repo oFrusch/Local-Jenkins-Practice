@@ -1,0 +1,391 @@
+/*
+This is not the file that will be run as the pipeline for Jenkins smoke test jobs
+I am writing this ahead of time as our Jenkins development server is not at a recent
+enough version to install the pipeline plugin
+
+When the actual pipeline script is being developed I will pull each of these functions
+one by one and slowly test their correctness before moving onto the next online
+
+This is just being created ahead of time to get the intial idea of how to do this with
+Groovy on the table
+
+When rewriting can probably eliminate a lot of the variables
+They are necessary in the ant script bc of the lack of return values in XML scripting
+Thus we can just have functions return values here instead and decrease the amount
+of extraneous variables
+
+Many (most?) of the functions will be written as stages when the actual script is written
+Right now I am writing them all as functions because the syntax is similar and
+I am not sure what targets is test_tcm actually function as stages
+Need to meet with someone and figure out how the build process actual runs for
+the smoke tests
+*/
+
+
+
+// Workspace location will be folder that contains both sqa-tools and znet-scripts
+string workspace = ".."
+string env_property = "env"
+
+// PATHS
+// Can't use workspace-scripts as script is keyword in Groovy
+string workspace_sqa_tools = workspace + "/sqa-tools"
+// Temporarily hardcoding this bc don't know how to access Jenkins build params
+// string workspace_scrpts = workspace + "/" + env.getProperty("TEST_SCRIPT_REPO")
+string workspace_scrpts = workspace + "/znet-scripts"
+string workspace_scrpts_regression = workspace + "/znet-scripts/Regression"
+string workspace_scrpts_regression_build = workspace + "/znet-scripts/Regression/buildLib"
+
+string workspace_jar_location = workspace_sqa_tools + "/lib"
+string workspace_results = workspace_scrpts + "/Results"
+string workspace_scrpt_results = workspace_scrpts + "/TestResults/Log"
+string workspace_scrpt_artifacts = workspace_scrpts + "/Artifacts"
+string workspace_scrpts_artifacts_build = workspace_scrpt_artifacts + "/Test-Binaries"
+string workspace_scrpts_artifacts_framework = workspace_scrpt_artifacts + "/Framework"
+string workspace_scrpts_artifacts_branched-framework = workspace_scrpt_artifacts + "/BranchedFramework"
+
+// JARs
+string JUNIT = "junit-4.12.jar"
+string junit_jar = workspace_jar_location + "/" + JUNIT
+string junit_hamcrest = workspace_jar_location + "/hamcrest-core-1.3.jar"
+string commons_lang_jar = workspace_jar_location + "/commons-lang3-3.1.jar"
+string commons_net_jar = workspace_jar_location +  "/commons-net-2.0.jar"
+string serialio_jar = workspace_jar_location + "/Serialio.jar"
+string jdbc_jar = workspace_jar_location + "/mysql-connector-java-5.1.18-bin.jar"
+string commons_io_jar = workspace_jar_location + "/commons-io-2.4.jar"
+string json_jar = workspace_jar_location + "/json-20160810.jar"
+string math_jar = workspace_jar_location + "/commons-math3-3.6.1.jar"
+string jsoup_jar = workspace_jar_location + "/jsoup-1.10.2.jar"
+string studiormi_jar = workspace_jar_location + "/silabs-studiormi.jar"
+
+string basic_classpath = junit_jar + ";" + junit_hamcrest + ";" + commons_lang_jar
+                         + ";" + commons_net_jar + ";" + serialio_jar + ";"
+                         + commons_io_jar
+string python_modules = workspace_sqa_tools + "/modules/python"
+// Hardcoding this until I figure out how to get params from Jenkins
+// string RESULTS_ZIP_TAG = env.getProperty("TEST_SUITE") + "_" + env.getProperty("TEST_BRANCH_NAME")
+//                          + "_" + env.getProperty("TEST_BUILD_NUMBER")
+string RESULTS_ZIP_TAG = "SmokeTest_Modular_release/zigbee_6.00_148"
+string RESULTS_TAG = "release/zigbee_6.00_148"
+string RESULTS_LOCATION = "//koto/shared/QAshare/Results"
+
+// Studio Paths
+string studio_default_workspace = "C:/users/" + env.getProperty("USERNAME") + "/SimplicityStudio"
+string studio_default_install_dir = "C:/SiliconLabs/SimplicityStudio"
+string studio_install_log = workspace + "/StudioUpdateLog.txt"
+boolean studio_default_workspace_exists = false
+boolean studio_check_run = false
+boolean studio_install_offline_run = false
+
+// Stack Paths
+string stack_install_dir = "C:/regression/latestBuild"
+string stack_install_log = stack_install_dir + "/stackUpdateLog.txt"
+
+// Default values - Some will be input from Jenkins
+string DELETE_RH_DIR = env.getProperty("DELETE_RH_DIR")
+boolean STUDIO_CHECK = false
+string STUDIO_INSTALL = env.getProperty("STUDIO_INSTALL")
+string STUDIO_INSTALL_DIR = studio_default_install_dir
+boolean STUDIO_INSTALL_IMAGE = true
+boolean ISD_INSTALL = false
+def PULL_INSTALLER = env.getProperty("PULL_INSTALLER")
+string TEST_LANGUAGE = "JAVA"
+def BUILD_APPLICATIONS = env.getProperty("BUILD_APPLICATIONS")
+def ARCHIVE_BUILD_ARTIFACTS = env.getProperty("ARCHIVE_BUILD_ARTIFACTS")
+def USE_ARCHIVED_ARTIFACTS = env.getProperty("USE_ARCHIVED_ARTIFACTS")
+def RUN_SETUP = env.getProperty("RUN_SETUP")
+def RUN_TOOL = false
+def RUN_TCM_SETUP = true
+def RUN_SUITE = env.getProperty("RUN_SUITE")
+def RUN_SUITE_FAIL = false
+def CLEAN_WORKSPACE = env.getProperty("CLEAN_WORKSPACE")
+def ECHO_TEST = env.getProperty("ECHO_TEST")
+def PUBLISH_RESULTS = env.getProperty("PUBLISH_RESULTS")
+def PROJECT_ZNET = false
+def PROJECT_ZIP = false
+def ISD_BUILD_NUMBER = ""
+string BUILD_APP_TOOL = "STUDIO"
+string TEST_APP_NAME = "none"
+string TEST_BOARD_ID = "none"
+string STUDIO_MIRROR_LOCATION = env.getProperty("STUDIO_MIRROR_LOCATION")
+string STUDIO_MAJOR_VERSION = "4"
+STUDIO_EARLY_ACCESS = env.getProperty("STUDIO_EARLY_ACCESS")
+boolean STUDIO_INI_MODS = false
+string STUDIO_WORKSPACE = env.getProperty("RH_BUILD_DIR") + "/StudioWorkspace"
+boolean STUDIO_CLEAN = true
+string TEST_PACKAGES = "none"
+
+// Installer URLs
+string INSTALLER_URL_SDK = env.getProperty("INSTALLER_URL_SDK")
+string INSTALLER_URL_COMMON = env.getProperty("INSTALLER_URL_COMMON")
+string INSTALLER_URL_BLE = ""
+string INSTALLER_URL_FLEX = ""
+string INSTALLER_URL_THREAD = ""
+string INSTALLER_URL_ZIGBEE = ""
+string INSTALLER_URL_MCU = ""
+
+string TCM_VERSION = "submodules/tcmgr (release_1_7_4-g118babe)"
+
+// boolean run_java = false
+// boolean run_python = false
+boolean run_setup_script = false
+
+boolean use_offline = false
+if(STUDIO_MIRROR_LOCATION.contains("WSQA") || STUDIO_MIRROR_LOCATION.contains("targeted")){
+  use_offline = true
+}
+
+
+// Methods
+def resolveStudio(){
+  // ????? <taskdef resource="net/sf/antcontrib/antlib.xml" /> ??????
+  string property_URL = "http://jnkaus016.silabs.com:8080/job/rc.links/lastSuccessfulBuild/artifact/rcLinks.properties"
+  string ACTUAL_STUDIO_MIRROR_LOCATION = STUDIO_MIRROR_LOCATION
+}
+
+// Check if Java needs to be run
+def runJavaCheck(){
+  // if(RUN_SUITE && TEST_LANGUAGE.equals("JAVA")){
+  //   run_java = true
+  // }
+  return RUN_SUITE && TEST_LANGUAGE.equals("JAVA")
+}
+
+// Checks if Python neesd to be run
+def runPythonCheck(){
+  // if(RUN_SUITE && TEST_LANGUAGE.equals("PYTHON")){
+  //   run_python = true
+  // }
+  return RUN_SUITE && TEST_LANGUAGE.equals("PYTHON")
+}
+
+// Checks if specified file is available if RUN_SETUP is set to true
+// If file is available then it sets run_setup_script to true
+def checkSetupScript(){
+  if(RUN_SETUP){
+    def filePath = workspace_scrpts + "/RegressionHarness/suites/" + env.getProperty("TEST_SUITE") + "_setup.sh"
+    def file = new File(filePath)
+    if(file.exists()){
+      run_setup_script = true
+    }
+  }
+}
+
+// Run all methods necessary for a build
+def runAll(){
+  compileJava()
+  deleteRegressionDir()
+  installOfflineStudio()
+  installStudio()
+  checkAndInstallStudio()
+  installISD()
+  pullDownBuildPackage()
+  buildTestApplications()
+  archiveBuildArtifacts()
+  runTestbedSetupScript()
+  runTestsJava()
+  runTestsPython()
+  // echoTarget();
+  runToolJava()
+}
+
+// Check if the tool chain manager needs to be setup
+def tcm_setup(){
+  if(RUN_TCM_SETUP){
+    // Arguments values may need to be on one line
+    sh """cd ${workspace_sqa_tools}/TestFramework
+          /c
+          validate_tcm.bat ${workspace_scrpts} ${TCM_VERSION}
+    """
+    // TODO
+
+    // Need to figure out how to convert this to Groovy
+    // <exec executable="cmd" dir="${workspace.scripts}" failonerror="true">
+    //   <!-- TCM 1.4.3 will overwrite autocrlf to "true" unless this env
+    //   variable is set TCMGR-40-->
+    //   <env key="TCM_IGNORE_GITCONFIG" value="true"/>
+    //   <arg value="/c"/>
+    //   <arg value="setup.bat"/>
+    //  </exec>
+    // <replaceregexp file="${workspace.scripts}\projenv.properties"
+    //              match="\\"
+    //              replace="/"
+    //              flags="g"/>
+    // <replaceregexp file="${workspace.scripts}\projenv.properties"
+    //              match="%%"
+    //              replace="%"
+    //              flags="g"/>
+  }
+}
+
+// TODO
+def deleteRegressionDir(){
+  return
+}
+
+// Checks if the directory for the default studio workspace already exists
+def studioDefaultWorkspaceDirCheck(){
+  return new File(studio_default_workspace).exists()
+  /*
+  def ws = new File(studio_default_workspace)
+  if(ws.exists()){
+    studio_default_workspace_exists = true
+  }
+  return studio_default_workspace
+  */
+}
+
+// Deletes the studio default workspace if it already exists
+def deleteStudioDefaulWorkspace(){
+  // Check if workspace exists
+  if(studioDefaultWorkspaceDirCheck()){
+    // echo shell command then delete file
+    sh """echo Deleted studio.defaultWorkspace = ${studio_default_workspace} """
+    new File(studio_default_workspace).delete()
+  }
+}
+
+// TODO
+def checkStudio(){
+  // call resolveStudio()
+  return
+}
+
+// Shell commands to install studio via an Ant xml file
+def actuallyInstallStudio(){
+  sh """echo Downloading and installing Studio"""
+  // figure out how to record command line output into a text file
+  sh """cd studio/studioUpdate
+        ant -file updateStudio.xml -studioMirrorLocation ${ACTUAL_STUDIO_MIRROR_LOCATION} -studioMajorVersion
+            ${STUDIO_MAJOR_VERSION} -studioInstallDir ${STUDIO_INSTALL_DIR} -earlyAccess ${STUDIO_EARLY_ACCESS}
+            -userDirectory ${STUDIO_WORKSPACE} -userDirectory ${STUDIO_WORKSPACE} -studioModIniFile
+            ${STUDIO_INI_MODS} -studioClean ${STUDIO_CLEAN}
+    """
+  // Once I figure how to record cmd line into text file copy it to specified directory
+}
+
+// This seems extraneous
+def installStudio(){
+  if(!use_offline){
+    actuallyInstallStudio()
+  }
+}
+
+// Check if studio is installed - If not and device is online then install studio
+def checkAndInstallStudio(){
+  checkStudio() // Not currently implemented
+}
+
+// Check if studio needs to be installed via system requirements
+def investigateStudioInstallAndCheck(){
+  // if(!STUDIO_INSTALL && STUDIO_CHECK){
+  //   studio_check_run = true
+  // }
+  return !STUDIO_INSTALL && STUDIO_CHECK
+}
+
+// Check whether Studio should be installed offline
+def installOfflineCheck(){
+  // if(STUDIO_INSTALL && use_offline){
+  //   studio_install_offline_run = true
+  // }
+  // return studio_install_offline_run
+  return STUDIO_INSTALL && use_offline
+}
+
+// if installOfflineCheck returns true then actually install Studio offline
+def installStudioOffline(){
+  if(installOfflineCheck()){
+    deleteStudioDefaultWorkspace();
+    sh """mkdir ${STUDIO_INSTALL_DIR} """
+    // Need to figure out how to record cmd line output into a text file
+    sh """cd studio/studioUpdate
+          ant -f updateStudio.xml deployOfflineStudio -studioMirrorLocation ${STUDIO_MIRROR_LOCATION} -studioInstallDir ${STUDIO_INSTALL_DIR}
+          -userDirectory ${STUDIO_WORKSPACE}
+    """
+  }
+}
+
+// Call a perl script to install ISD if ISD_INSTALL is set to true
+def installISD(){
+  if(ISD_INSTALL){
+    // Move to sqa-tools/upgrade directory then run perl script
+    sh """echo ISD install running"""
+    sh """cd ${workspace_sqa_tools}/upgrade
+          isdInstall.pl --major ${ISD_MAJOR_VERSION} --minor ${ISD_BUILD_NUMBER}
+    """
+  }
+  sh """echo ISD install not run"""
+}
+
+// Get Pullowdown installers
+def pullDownBuildPackage(){
+  // TODO
+  return
+}
+
+// Build Test Applcations
+def buildTestApplications(){
+  sh """echo Building applications for ${TEST_SCRIPT_REPO} suite ${TEST_SUITE}"""
+  // Switch to directory that contains application files then call python script
+  sh """cd ${workspace_scrpts_regression_build}
+        -u buildTestApplications.py ${workspace_scrpts} ${TEST_BUILD_MAJOR_NUMBER} ${TEST_BUILD_NUMBER}
+        ${TEST_SUITE} ${TEST_BRANCH_NAME} ${USE_ARCHIVED_ARTIFACTS} ${BUILD_APP_TOOL} ${TEST_APP_NAME} ${TEST_BOARD_ID}
+   """
+}
+
+def archiveBuildArtifacts(){
+  // if ARCHIVE_BUILD_ARTIFACTS is set to true then migrate to workspace_scrpts_regression_build
+  // directory and run archiveBuildArtifacts.py
+  if(ARCHIVE_BUILD_ARTIFACTS){
+    sh """cd ${workspace_scrpts_regression_build}
+          -u archiveBuildArtifacts.py ${TEST_SUITE} ${TEST_BRANCH_NAME} ${TEST_BUILD_NUMBER} ${TEST_BOARD_ID}
+    """
+    sh """Archiving build artifacts"""
+  }
+  sh """Did not archive build artifacts"""
+}
+
+// Set up test test beds
+def runTestbedSetupScript(){
+  sh """cd ${workspace_scrpts}/RegressionHarness/suites/${TEST_SUITE}
+        ${TEST_SUITE}_setup.sh
+        ${workspace_scrpts}/RegressionHarness/suites/${TEST_SUITE}
+  """
+}
+
+// This one is huge - Will do later
+def compileJava(){
+  // TODO
+  return
+}
+
+// Run Java JUnit tests
+def runTestsJava(){
+  // TODO
+  return
+}
+
+// Runs Java tool, which does?
+def runJavaTool(){
+  // TODO
+  return
+}
+
+// Run Python tests
+def runTestsPython(){
+  // TODO
+  return
+}
+
+// Rearranges what files are in what directories
+def cleanWorkspace(){
+  // TODO
+  return
+}
+
+// Publishes final results of tests and their effect on the system
+def publishResults(){
+  // TODO
+  return
+}
